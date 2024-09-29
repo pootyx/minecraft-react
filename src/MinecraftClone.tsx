@@ -23,6 +23,14 @@ import {
   Vector3,
 } from 'three';
 
+enum BlockTypes {
+  DIRT = 0,
+  GRASS = 1,
+  WOOD = 2,
+  STONE = 3,
+  SAND = 4,
+}
+
 // Defining BlockProps for the Block component
 interface BlockProps {
   position: [number, number, number];
@@ -34,6 +42,8 @@ interface BlockProps {
 interface BlockType {
   key: string;
   position: [number, number, number];
+  uuid: string; // Add this line
+  type: BlockTypes;
 }
 
 // Character component
@@ -42,7 +52,7 @@ function Character() {
     mass: 1,
     position: [0, 3, 0],
     fixedRotation: true,
-    args: [1, 1, 1], // Player hitbox dimensions
+    args: [0.75, 1.8, 0.75], // Player hitbox dimensions
     angularDamping: 1.0, // Prevent unwanted rotations
     material: {
       friction: 0.0, // Remove friction to allow consistent movement
@@ -132,8 +142,15 @@ function Block({
   onRemove,
   handlePlaceBlock,
   isSelected,
+  uuid,
+  type,
 }: BlockProps & {
-  handlePlaceBlock: (position: [number, number, number]) => void;
+  handlePlaceBlock: (
+    position: [number, number, number],
+    normal: [number, number, number]
+  ) => void;
+  uuid: string;
+  type: BlockTypes;
 }) {
   const ref = useRef<Mesh<BufferGeometry, Material | Material[]>>(null);
   const [api] = useBox(
@@ -150,102 +167,80 @@ function Block({
   // Load the textures
   const dirtTexture = useLoader(TextureLoader, '/textures/dirt.png');
   const grassTexture = useLoader(TextureLoader, '/textures/grass.png');
+  const stoneTexture = useLoader(TextureLoader, '/textures/stone.png');
+  const sandTexture = useLoader(TextureLoader, '/textures/sand.png');
+  const woodTexture = useLoader(TextureLoader, '/textures/wood.png');
 
   const [cracks, setCracks] = useState(0);
-  const [mining, setMining] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
-    if (mining) {
+    if (isSelected && cracks > 0) {
       interval = setInterval(() => {
-        setCracks((prev) => prev + 1);
+        setCracks((prev) => {
+          if (prev >= 3 && interval) {
+            clearInterval(interval);
+            api.current?.remove();
+            onRemove();
+            return 0;
+          }
+          return prev + 1;
+        });
       }, 1000);
-
-      if (cracks >= 3) {
-        clearInterval(interval);
-        setTimeout(() => {
-          api.current?.remove(); // Correctly remove the physics body from the world
-          onRemove();
-        }, 300);
-      }
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [cracks, mining, onRemove, api]);
+  }, [cracks, isSelected, onRemove, api]);
 
   const handlePointerDown = (event: ThreeEvent<MouseEvent>) => {
-    if (event.nativeEvent.button === 0) {
-      setMining(true);
+    if (event.nativeEvent.button === 0 && isSelected) {
+      setCracks((prev) => prev + 1);
     } else if (event.nativeEvent.button === 2) {
-      // Handle right-click for block placement
-      event.stopPropagation(); // Prevent any parent events
-
-      // Determine which face of the block was clicked and place a new block accordingly
-      const intersectPoint = event.point;
+      event.stopPropagation();
       const faceNormal = event.face?.normal;
 
       if (faceNormal) {
-        // Calculate the position to place the new block based on the clicked face
-        const newBlockPosition = new Vector3()
-          .copy(intersectPoint)
-          .add(faceNormal)
-          .floor()
-          .addScalar(0.5)
-          .floor();
-
-        // Convert to tuple to match handlePlaceBlock type
-        const newBlockPositionTuple: [number, number, number] = [
-          newBlockPosition.x,
-          newBlockPosition.y,
-          newBlockPosition.z,
+        const normalArray: [number, number, number] = [
+          faceNormal.x,
+          faceNormal.y,
+          faceNormal.z,
         ];
-
-        // Check if there is already a block at this position before placing
-        handlePlaceBlock(newBlockPositionTuple);
+        handlePlaceBlock(position, normalArray);
       }
     }
   };
 
   const handlePointerUp = () => {
-    setMining(false);
     setCracks(0);
   };
 
-  const materials = [
-    new MeshStandardMaterial({
-      map: dirtTexture,
-      opacity: 1 - cracks * 0.3,
-      transparent: true,
-    }), // right face (+X)
-    new MeshStandardMaterial({
-      map: dirtTexture,
-      opacity: 1 - cracks * 0.3,
-      transparent: true,
-    }), // left face (-X)
-    new MeshStandardMaterial({
-      map: grassTexture,
-      opacity: 1 - cracks * 0.3,
-      transparent: true,
-    }), // top face (+Y)
-    new MeshStandardMaterial({
-      map: dirtTexture,
-      opacity: 1 - cracks * 0.3,
-      transparent: true,
-    }), // bottom face (-Y)
-    new MeshStandardMaterial({
-      map: dirtTexture,
-      opacity: 1 - cracks * 0.3,
-      transparent: true,
-    }), // front face (+Z)
-    new MeshStandardMaterial({
-      map: dirtTexture,
-      opacity: 1 - cracks * 0.3,
-      transparent: true,
-    }), // back face (-Z)
-  ];
+  const getTexture = (blockType: BlockTypes) => {
+    switch (blockType) {
+      case BlockTypes.DIRT:
+        return dirtTexture;
+      case BlockTypes.GRASS:
+        return grassTexture;
+      case BlockTypes.WOOD:
+        return woodTexture;
+      case BlockTypes.STONE:
+        return stoneTexture;
+      case BlockTypes.SAND:
+        return sandTexture;
+      default:
+        return dirtTexture;
+    }
+  };
+
+  const texture = getTexture(type);
+
+  const material = new MeshStandardMaterial({
+    map: texture,
+    opacity: 1 - cracks * 0.3,
+    transparent: true,
+  });
 
   return (
     <mesh
@@ -256,10 +251,11 @@ function Block({
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerOut={handlePointerUp}
-      material={materials}
+      material={material}
+      uuid={uuid} // Set the UUID here
     >
       <boxGeometry args={[1, 1, 1]} />
-      {isSelected && <Edges color="red" />}
+      {isSelected && <Edges color="green" />}
     </mesh>
   );
 }
@@ -272,7 +268,10 @@ function World({
 }: {
   blocks: BlockType[];
   handleRemoveBlock: (key: string) => void;
-  handlePlaceBlock: (position: [number, number, number]) => void;
+  handlePlaceBlock: (
+    position: [number, number, number],
+    normal: [number, number, number]
+  ) => void;
   selectedBlock: string | null;
 }) {
   return (
@@ -283,7 +282,9 @@ function World({
           position={block.position}
           onRemove={() => handleRemoveBlock(block.key)}
           handlePlaceBlock={handlePlaceBlock}
-          isSelected={block.key === selectedBlock}
+          isSelected={block.uuid === selectedBlock}
+          uuid={block.uuid}
+          type={block.type}
         />
       ))}
     </>
@@ -323,6 +324,9 @@ function RaycastSelector({
 function MinecraftClone() {
   const [blocks, setBlocks] = useState<BlockType[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
+  const [currentBlockType, setCurrentBlockType] = useState<BlockTypes>(
+    BlockTypes.DIRT
+  );
 
   useEffect(() => {
     const initialBlocks: BlockType[] = [];
@@ -332,6 +336,8 @@ function MinecraftClone() {
         initialBlocks.push({
           key: `${x}-0-${z}`,
           position: [x, 0, z],
+          uuid: Math.random().toString(36).substr(2, 9),
+          type: BlockTypes.GRASS,
         });
       }
     }
@@ -340,12 +346,22 @@ function MinecraftClone() {
 
   const handleRemoveBlock = (key: string) => {
     setBlocks((prevBlocks) => prevBlocks.filter((block) => block.key !== key));
+    setSelectedBlock(null);
   };
 
-  const handlePlaceBlock = (position: [number, number, number]) => {
-    const newKey = `${position[0]}-${position[1]}-${position[2]}`;
+  const handlePlaceBlock = (
+    position: [number, number, number],
+    normal: [number, number, number]
+  ) => {
+    const newPosition: [number, number, number] = [
+      position[0] + normal[0],
+      position[1] + normal[1],
+      position[2] + normal[2],
+    ];
+
+    const newKey = `${newPosition[0]}-${newPosition[1]}-${newPosition[2]}`;
     if (blocks.some((block) => block.key === newKey)) {
-      console.log('Block already exists at this position:', position);
+      console.log('Block already exists at this position:', newPosition);
       return;
     }
 
@@ -353,10 +369,31 @@ function MinecraftClone() {
       ...prevBlocks,
       {
         key: newKey,
-        position,
+        position: newPosition,
+        uuid: Math.random().toString(36).substr(2, 9),
+        type: currentBlockType,
       },
     ]);
   };
+
+  const cycleBlockType = () => {
+    setCurrentBlockType(
+      (prevType) => (prevType + 1) % Object.keys(BlockTypes).length
+    );
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'b' || event.key === 'B') {
+        cycleBlockType();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [cycleBlockType]);
 
   return (
     <Canvas>
