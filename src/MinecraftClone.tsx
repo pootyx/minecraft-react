@@ -1,9 +1,27 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Canvas, ThreeEvent, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { Physics, usePlane, useBox } from '@react-three/cannon';
-import { Edges, PointerLockControls, Sky, useKeyboardControls } from '@react-three/drei';
-import * as THREE from 'three';
-import { Mesh, Vector3, BufferGeometry, Material, Raycaster, TextureLoader, MeshStandardMaterial } from 'three';
+import { Physics, useBox } from '@react-three/cannon';
+import {
+  Edges,
+  PointerLockControls,
+  Sky,
+  useKeyboardControls,
+} from '@react-three/drei';
+import {
+  Canvas,
+  ThreeEvent,
+  useFrame,
+  useLoader,
+  useThree,
+} from '@react-three/fiber';
+import { useEffect, useRef, useState } from 'react';
+import {
+  BufferGeometry,
+  Material,
+  Mesh,
+  MeshStandardMaterial,
+  Raycaster,
+  TextureLoader,
+  Vector3,
+} from 'three';
 
 // Defining BlockProps for the Block component
 interface BlockProps {
@@ -32,7 +50,12 @@ function Character() {
   }));
 
   const velocity = useRef([0, 0, 0]);
-  useEffect(() => api.velocity.subscribe((v) => (velocity.current = v)), [api.velocity]);
+  useEffect(() => {
+    const unsubscribe = api.velocity.subscribe((v) => {
+      velocity.current = v;
+    });
+    return unsubscribe;
+  }, [api.velocity]);
 
   const [sub, get] = useKeyboardControls();
   const { camera } = useThree();
@@ -54,7 +77,9 @@ function Character() {
 
     // Create the right direction vector based on the camera direction
     const rightDirection = new Vector3();
-    rightDirection.crossVectors(new Vector3(0, 1, 0), cameraDirection).normalize();
+    rightDirection
+      .crossVectors(new Vector3(0, 1, 0), cameraDirection)
+      .normalize();
 
     // Final movement direction calculation
     const finalDirection = new Vector3();
@@ -71,7 +96,11 @@ function Character() {
 
     if (direction.length() > 0) {
       // Set velocity based on the calculated direction and speed, keeping y-axis velocity unchanged
-      api.velocity.set(finalDirection.x * speed, yVelocity, finalDirection.z * speed);
+      api.velocity.set(
+        finalDirection.x * speed,
+        yVelocity,
+        finalDirection.z * speed
+      );
     } else {
       // If no input, retain the current y velocity while stopping horizontal movement
       api.velocity.set(0, yVelocity, 0);
@@ -86,24 +115,41 @@ function Character() {
     if (ref.current) {
       const playerPosition = new Vector3();
       ref.current.getWorldPosition(playerPosition);
-      camera.position.set(playerPosition.x, playerPosition.y + 1.0, playerPosition.z);
+      camera.position.set(
+        playerPosition.x,
+        playerPosition.y + 1.0,
+        playerPosition.z
+      );
     }
   });
 
   return null;
 }
 
-
 // Block component
-function Block({ position, onRemove, handlePlaceBlock, isSelected }: BlockProps & { handlePlaceBlock: (position: [number, number, number]) => void }) {
+function Block({
+  position,
+  onRemove,
+  handlePlaceBlock,
+  isSelected,
+}: BlockProps & {
+  handlePlaceBlock: (position: [number, number, number]) => void;
+}) {
   const ref = useRef<Mesh<BufferGeometry, Material | Material[]>>(null);
-  const [api] = useBox(() => ({ type: 'Static', position,     material: {
-    friction: 0.0, // Remove friction to allow consistent movement
-  },}), ref);
+  const [api] = useBox(
+    () => ({
+      type: 'Static',
+      position,
+      material: {
+        friction: 0.0, // Remove friction to allow consistent movement
+      },
+    }),
+    ref
+  );
 
-    // Load the textures
-    const dirtTexture = useLoader(TextureLoader, '/textures/dirt.png');
-    const grassTexture = useLoader(TextureLoader, '/textures/grass.png');
+  // Load the textures
+  const dirtTexture = useLoader(TextureLoader, '/textures/dirt.png');
+  const grassTexture = useLoader(TextureLoader, '/textures/grass.png');
 
   const [cracks, setCracks] = useState(0);
   const [mining, setMining] = useState(false);
@@ -169,12 +215,36 @@ function Block({ position, onRemove, handlePlaceBlock, isSelected }: BlockProps 
   };
 
   const materials = [
-    new MeshStandardMaterial({ map: dirtTexture, opacity: 1 - cracks * 0.3, transparent: true }), // right face (+X)
-    new MeshStandardMaterial({ map: dirtTexture, opacity: 1 - cracks * 0.3, transparent: true }), // left face (-X)
-    new MeshStandardMaterial({ map: grassTexture, opacity: 1 - cracks * 0.3, transparent: true }), // top face (+Y)
-    new MeshStandardMaterial({ map: dirtTexture, opacity: 1 - cracks * 0.3, transparent: true }), // bottom face (-Y)
-    new MeshStandardMaterial({ map: dirtTexture, opacity: 1 - cracks * 0.3, transparent: true }), // front face (+Z)
-    new MeshStandardMaterial({ map: dirtTexture, opacity: 1 - cracks * 0.3, transparent: true }), // back face (-Z)
+    new MeshStandardMaterial({
+      map: dirtTexture,
+      opacity: 1 - cracks * 0.3,
+      transparent: true,
+    }), // right face (+X)
+    new MeshStandardMaterial({
+      map: dirtTexture,
+      opacity: 1 - cracks * 0.3,
+      transparent: true,
+    }), // left face (-X)
+    new MeshStandardMaterial({
+      map: grassTexture,
+      opacity: 1 - cracks * 0.3,
+      transparent: true,
+    }), // top face (+Y)
+    new MeshStandardMaterial({
+      map: dirtTexture,
+      opacity: 1 - cracks * 0.3,
+      transparent: true,
+    }), // bottom face (-Y)
+    new MeshStandardMaterial({
+      map: dirtTexture,
+      opacity: 1 - cracks * 0.3,
+      transparent: true,
+    }), // front face (+Z)
+    new MeshStandardMaterial({
+      map: dirtTexture,
+      opacity: 1 - cracks * 0.3,
+      transparent: true,
+    }), // back face (-Z)
   ];
 
   return (
@@ -194,8 +264,17 @@ function Block({ position, onRemove, handlePlaceBlock, isSelected }: BlockProps 
   );
 }
 
-
-function World({ blocks, handleRemoveBlock, handlePlaceBlock, selectedBlock  }: { blocks: BlockType[], handleRemoveBlock:(key: string) => void, handlePlaceBlock: (position: [number, number, number]) => void, selectedBlock: string | null }) {
+function World({
+  blocks,
+  handleRemoveBlock,
+  handlePlaceBlock,
+  selectedBlock,
+}: {
+  blocks: BlockType[];
+  handleRemoveBlock: (key: string) => void;
+  handlePlaceBlock: (position: [number, number, number]) => void;
+  selectedBlock: string | null;
+}) {
   return (
     <>
       {blocks.map((block) => (
@@ -212,7 +291,9 @@ function World({ blocks, handleRemoveBlock, handlePlaceBlock, selectedBlock  }: 
 }
 
 // RaycastSelector component to determine the selected block
-function RaycastSelector({ setSelectedBlock } :  {
+function RaycastSelector({
+  setSelectedBlock,
+}: {
   setSelectedBlock: (uuid: string | null) => void;
 }) {
   const { camera, scene } = useThree();
@@ -220,8 +301,14 @@ function RaycastSelector({ setSelectedBlock } :  {
 
   useFrame(() => {
     // Raycasting to determine the selected block
-    raycaster.current.set(camera.position, camera.getWorldDirection(new Vector3()));
-    const intersects = raycaster.current.intersectObjects(scene.children, false);
+    raycaster.current.set(
+      camera.position,
+      camera.getWorldDirection(new Vector3())
+    );
+    const intersects = raycaster.current.intersectObjects(
+      scene.children,
+      false
+    );
     if (intersects.length > 0) {
       const intersectedBlock = intersects[0].object;
       setSelectedBlock(intersectedBlock.uuid);
@@ -232,7 +319,6 @@ function RaycastSelector({ setSelectedBlock } :  {
 
   return null;
 }
-
 
 function MinecraftClone() {
   const [blocks, setBlocks] = useState<BlockType[]>([]);
@@ -252,7 +338,6 @@ function MinecraftClone() {
     setBlocks(initialBlocks);
   }, []);
 
-
   const handleRemoveBlock = (key: string) => {
     setBlocks((prevBlocks) => prevBlocks.filter((block) => block.key !== key));
   };
@@ -260,7 +345,7 @@ function MinecraftClone() {
   const handlePlaceBlock = (position: [number, number, number]) => {
     const newKey = `${position[0]}-${position[1]}-${position[2]}`;
     if (blocks.some((block) => block.key === newKey)) {
-      console.log("Block already exists at this position:", position);
+      console.log('Block already exists at this position:', position);
       return;
     }
 
@@ -280,7 +365,12 @@ function MinecraftClone() {
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       <Physics>
-        <World blocks={blocks} handleRemoveBlock={handleRemoveBlock} handlePlaceBlock={handlePlaceBlock} selectedBlock={selectedBlock} />
+        <World
+          blocks={blocks}
+          handleRemoveBlock={handleRemoveBlock}
+          handlePlaceBlock={handlePlaceBlock}
+          selectedBlock={selectedBlock}
+        />
         <Character />
         <RaycastSelector setSelectedBlock={setSelectedBlock} />
       </Physics>
