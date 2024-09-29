@@ -1,6 +1,5 @@
-import React from 'react';
 import { KeyboardControls } from '@react-three/drei';
-import MinecraftClone from './MinecraftClone';
+import MinecraftClone from './Minecraft';
 
 function App() {
   return (
