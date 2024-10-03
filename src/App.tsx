@@ -1,5 +1,5 @@
 import { KeyboardControls } from '@react-three/drei';
-import MinecraftClone from './Minecraft';
+import Minecraft from './Minecraft';
 
 function App() {
   return (
@@ -13,7 +13,7 @@ function App() {
       ]}
     >
       <div style={{ width: '100vw', height: '100vh' }}>
-        <MinecraftClone />
+        <Minecraft />
       </div>
     </KeyboardControls>
   );

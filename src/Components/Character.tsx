@@ -4,7 +4,11 @@ import { Vector3, Box3 } from 'three';
 import { useKeyboardControls } from '@react-three/drei';
 import { BlockType } from './Block';
 
-function Character({ blocks }: { blocks: BlockType[] }) {
+function Character({
+  blocks,
+  playerId,
+  socket,
+}: { blocks: BlockType[]; playerId: string; socket: WebSocket | null }) {
   const { camera } = useThree();
   const position = useRef(new Vector3(1, 200, 1));
   const velocity = useRef(new Vector3());
@@ -132,6 +136,17 @@ function Character({ blocks }: { blocks: BlockType[] }) {
 
     // Update camera position
     camera.position.copy(position.current);
+
+    // Send position updates to server
+    if (socket) {
+      socket.send(
+        JSON.stringify({
+          type: 'playerMove',
+          playerId: playerId,
+          position: position.current.toArray(),
+        })
+      );
+    }
   });
 
   return null;

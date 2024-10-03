@@ -7,6 +7,8 @@ import Character from './Components/Character';
 import RaycastSelector from './Components/RaycastSelector';
 import World from './Components/World';
 import { Perf } from 'r3f-perf';
+import { Vector3 } from 'three';
+import OtherPlayer from './Components/OtherPlayer';
 
 function Minecraft() {
   const [blocks, setBlocks] = useState<BlockType[]>([]);
@@ -14,6 +16,87 @@ function Minecraft() {
   const [currentBlockType, setCurrentBlockType] = useState<BlockTypes>(
     BlockTypes.DIRT
   );
+
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
+  const [otherPlayers, setOtherPlayers] = useState<{ [key: string]: Vector3 }>(
+    {}
+  );
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8080');
+    ws.onopen = () => {
+      console.log('Connected to server');
+      setSocket(ws);
+    };
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      handleServerMessage(message);
+    };
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  const handleBlockUpdate = (blockUpdate: {
+    block: BlockType;
+    action: 'add' | 'remove';
+  }) => {
+    const { block, action } = blockUpdate;
+
+    setBlocks((prevBlocks) => {
+      switch (action) {
+        case 'add':
+          if (!prevBlocks.some((b) => b.key === block.key)) {
+            return [...prevBlocks, block];
+          }
+          return prevBlocks;
+        case 'remove':
+          return prevBlocks.filter((b) => b.key !== block.key);
+        default:
+          console.warn('Unknown block update action:', action);
+          return prevBlocks;
+      }
+    });
+  };
+
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  const handleServerMessage = (message: any) => {
+    switch (message.type) {
+      case 'initialState':
+        setBlocks(message.blocks);
+        setPlayerId(message.playerId);
+        break;
+      case 'blockUpdate':
+        handleBlockUpdate(message.blockUpdate);
+        break;
+      case 'playerMove':
+        if (message.playerId !== playerId) {
+          setOtherPlayers((prev) => ({
+            ...prev,
+            [message.playerId]: new Vector3(...message.position),
+          }));
+        }
+        break;
+      case 'playerJoin':
+        if (message.playerId !== playerId) {
+          setOtherPlayers((prev) => ({
+            ...prev,
+            [message.playerId]: new Vector3(...message.position),
+          }));
+        }
+        break;
+      case 'playerLeave':
+        if (message.playerId !== playerId) {
+          setOtherPlayers((prev) => {
+            const newPlayers = { ...prev };
+            delete newPlayers[message.playerId];
+            return newPlayers;
+          });
+        }
+        break;
+    }
+  };
 
   useEffect(() => {
     const initialBlocks: BlockType[] = [];
@@ -45,6 +128,17 @@ function Minecraft() {
   const handleRemoveBlock = (key: string) => {
     setBlocks((prevBlocks) => prevBlocks.filter((block) => block.key !== key));
     setSelectedBlock(null);
+    if (socket) {
+      socket.send(
+        JSON.stringify({
+          type: 'blockUpdate',
+          blockUpdate: {
+            action: 'remove',
+            block: { key },
+          },
+        })
+      );
+    }
   };
 
   const handlePlaceBlock = (
@@ -63,35 +157,45 @@ function Minecraft() {
       return;
     }
 
-    setBlocks((prevBlocks) => [
-      ...prevBlocks,
-      {
-        key: newKey,
-        position: newPosition,
-        uuid: Math.random().toString(36).substr(2, 9),
-        type: currentBlockType,
-      },
-    ]);
-  };
-
-  const cycleBlockType = () => {
-    setCurrentBlockType(
-      (prevType) => (prevType + 1) % Object.keys(BlockTypes).length
-    );
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'b' || event.key === 'B') {
-        cycleBlockType();
-      }
+    const newBlock = {
+      key: newKey,
+      position: newPosition,
+      uuid: Math.random().toString(36).substr(2, 9),
+      type: currentBlockType,
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+    setBlocks((prevBlocks) => [...prevBlocks, newBlock]);
+    if (socket) {
+      socket.send(
+        JSON.stringify({
+          type: 'placeBlock',
+          blockUpdate: {
+            action: 'add',
+            block: newBlock,
+          },
+        })
+      );
+    }
+
+    const cycleBlockType = () => {
+      setCurrentBlockType(
+        (prevType) => (prevType + 1) % Object.keys(BlockTypes).length
+      );
     };
-  }, [cycleBlockType]);
+
+    useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'b' || event.key === 'B') {
+          cycleBlockType();
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }, [cycleBlockType]);
+  };
 
   return (
     <Canvas>
@@ -108,10 +212,16 @@ function Minecraft() {
           selectedBlock={selectedBlock}
           currentBlockType={currentBlockType}
         />
-        <Character blocks={blocks} />
+        {playerId && (
+          <Character blocks={blocks} playerId={playerId} socket={socket} />
+        )}
+        {Object.entries(otherPlayers).map(([id, position]) => (
+          <OtherPlayer key={id} position={position} />
+        ))}
         <RaycastSelector setSelectedBlock={setSelectedBlock} />
       </Physics>
     </Canvas>
   );
 }
+
 export default Minecraft;
