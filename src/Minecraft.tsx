@@ -1,16 +1,12 @@
 import { Physics } from '@react-three/cannon';
-import {
-  PointerLockControls,
-  Sky
-} from '@react-three/drei';
-import {
-  Canvas
-} from '@react-three/fiber';
+import { PointerLockControls, Sky } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber';
 import { useEffect, useState } from 'react';
 import { BlockType, BlockTypes } from './Components/Block';
 import Character from './Components/Character';
 import RaycastSelector from './Components/RaycastSelector';
 import World from './Components/World';
+import { Perf } from 'r3f-perf';
 
 function Minecraft() {
   const [blocks, setBlocks] = useState<BlockType[]>([]);
@@ -21,15 +17,26 @@ function Minecraft() {
 
   useEffect(() => {
     const initialBlocks: BlockType[] = [];
-    const size = 10;
+    const size = 100;
+    const depth = 1;
     for (let x = 0; x < size; x++) {
       for (let z = 0; z < size; z++) {
-        initialBlocks.push({
-          key: `${x}-0-${z}`,
-          position: [x, 0, z],
-          uuid: Math.random().toString(36).substr(2, 9),
-          type: BlockTypes.GRASS,
-        });
+        for (let y = 0; y < depth; y++) {
+          let blockType: BlockTypes;
+          if (y === depth - 1) {
+            blockType = BlockTypes.GRASS;
+          } else if (y > depth - 4) {
+            blockType = BlockTypes.DIRT;
+          } else {
+            blockType = BlockTypes.STONE;
+          }
+          initialBlocks.push({
+            key: `${x}-${y}-${z}`,
+            position: [x, y, z],
+            uuid: Math.random().toString(36).substr(2, 9),
+            type: blockType,
+          });
+        }
       }
     }
     setBlocks(initialBlocks);
@@ -88,6 +95,7 @@ function Minecraft() {
 
   return (
     <Canvas>
+      <Perf position="top-left" />
       <Sky />
       <PointerLockControls />
       <ambientLight intensity={0.5} />
@@ -98,8 +106,9 @@ function Minecraft() {
           handleRemoveBlock={handleRemoveBlock}
           handlePlaceBlock={handlePlaceBlock}
           selectedBlock={selectedBlock}
+          currentBlockType={currentBlockType}
         />
-        <Character />
+        <Character blocks={blocks} />
         <RaycastSelector setSelectedBlock={setSelectedBlock} />
       </Physics>
     </Canvas>
