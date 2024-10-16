@@ -9,7 +9,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
   },
   "dependencies": {
-    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.4.0"
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.49.0"
   },
   "devDependencies": {
     "@types/node": "^14.18.63",

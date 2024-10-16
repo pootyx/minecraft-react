@@ -4,8 +4,10 @@ import { Raycaster, Vector3 } from "three";
 
 function RaycastSelector({
   setSelectedBlock,
+  maxDistance = 5,
 }: {
   setSelectedBlock: (uuid: string | null) => void;
+  maxDistance?: number;
 }) {
   const { camera, scene } = useThree();
   const raycaster = useRef(new Raycaster());
@@ -17,11 +19,11 @@ function RaycastSelector({
     );
     const intersects = raycaster.current.intersectObjects(
       scene.children,
-      false
+      true
     );
-    if (intersects.length > 0) {
-      const intersectedBlock = intersects[0].object;
-      setSelectedBlock(intersectedBlock.uuid);
+    const closestIntersect = intersects.find(intersect => intersect.distance <= maxDistance);
+    if (closestIntersect) {
+      setSelectedBlock(closestIntersect.object.uuid);
     } else {
       setSelectedBlock(null);
     }

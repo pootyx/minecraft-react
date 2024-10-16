@@ -11,6 +11,7 @@ import { Vector3 } from 'three';
 import OtherPlayer from './Components/OtherPlayer';
 
 function Minecraft() {
+  const MAX_PLACE_DISTANCE = 5; // Maximum distance for block placement
   const [blocks, setBlocks] = useState<BlockType[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
   const [currentBlockType, setCurrentBlockType] = useState<BlockTypes>(
@@ -24,7 +25,7 @@ function Minecraft() {
   );
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8080');
+    const ws = new WebSocket('ws://localhost:9001');
     ws.onopen = () => {
       console.log('Connected to server');
       setSocket(ws);
@@ -145,30 +146,47 @@ function Minecraft() {
     position: [number, number, number],
     normal: [number, number, number]
   ) => {
+    if (!playerId) return; // Ensure player exists
+  
+    const playerPosition = new Vector3(...(otherPlayers[playerId] || [0, 0, 0]));
+    const blockPosition = new Vector3(...position);
+    
+    if (playerPosition.distanceTo(blockPosition) > MAX_PLACE_DISTANCE) {
+      console.log('Block is too far to place');
+      return;
+    }
+  
     const newPosition: [number, number, number] = [
       position[0] + normal[0],
       position[1] + normal[1],
       position[2] + normal[2],
     ];
-
+  
     const newKey = `${newPosition[0]}-${newPosition[1]}-${newPosition[2]}`;
     if (blocks.some((block) => block.key === newKey)) {
       console.log('Block already exists at this position:', newPosition);
       return;
     }
-
+  
     const newBlock = {
       key: newKey,
       position: newPosition,
       uuid: Math.random().toString(36).substr(2, 9),
       type: currentBlockType,
     };
-
-    setBlocks((prevBlocks) => [...prevBlocks, newBlock]);
+  
+    setBlocks((prevBlocks) => {
+      if (prevBlocks.some((block) => block.key === newKey)) {
+        console.log('Block already added');
+        return prevBlocks;
+      }
+      return [...prevBlocks, newBlock];
+    });
+  
     if (socket) {
       socket.send(
         JSON.stringify({
-          type: 'placeBlock',
+          type: 'blockUpdate',
           blockUpdate: {
             action: 'add',
             block: newBlock,
@@ -176,27 +194,7 @@ function Minecraft() {
         })
       );
     }
-
-    const cycleBlockType = () => {
-      setCurrentBlockType(
-        (prevType) => (prevType + 1) % Object.keys(BlockTypes).length
-      );
-    };
-
-    useEffect(() => {
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'b' || event.key === 'B') {
-          cycleBlockType();
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-      };
-    }, [cycleBlockType]);
   };
-
   return (
     <Canvas>
       <Perf position="top-left" />

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { BlockType, BlockTypes } from './Block';
 import InstancedBlocks from './InstancedBlocks';
 
@@ -34,7 +34,7 @@ function World({
     return groups;
   }, [blocks]);
 
-  const handleBlockInteraction = (
+  const handleBlockInteraction = useCallback((
     blockType: BlockTypes,
     index: number,
     action: 'remove' | 'place' | 'up'
@@ -47,7 +47,7 @@ function World({
     } else if (action === 'up') {
       // Do nothing
     }
-  };
+  }, [groupedBlocks, handleRemoveBlock, handlePlaceBlock]);
 
   return (
     <>
