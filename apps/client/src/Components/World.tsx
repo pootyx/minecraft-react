@@ -1,27 +1,14 @@
-import { useCallback, useMemo } from 'react';
-import { BlockType, BlockTypes } from './Block';
-import InstancedBlocks from './InstancedBlocks';
+import { useMemo } from "react";
+import { Block, BlockTypes } from "./Block";
+import InstancedBlocks from "./InstancedBlocks";
 
-interface WorldProps {
-  blocks: BlockType[];
-  handleRemoveBlock: (key: string) => void;
-  handlePlaceBlock: (
-    position: [number, number, number],
-    normal: [number, number, number]
-  ) => void;
-  selectedBlock: string | null;
-  currentBlockType: BlockTypes;
-}
+type WorldProps = {
+  blocks: Block[];
+};
 
-function World({
-  blocks,
-  handleRemoveBlock,
-  handlePlaceBlock,
-  selectedBlock,
-  currentBlockType,
-}: WorldProps) {
+function World({ blocks }: WorldProps) {
   const groupedBlocks = useMemo(() => {
-    const groups: { [key in BlockTypes]: BlockType[] } = {
+    const groups: { [key in BlockTypes]: Block[] } = {
       [BlockTypes.DIRT]: [],
       [BlockTypes.GRASS]: [],
       [BlockTypes.WOOD]: [],
@@ -34,21 +21,6 @@ function World({
     return groups;
   }, [blocks]);
 
-  const handleBlockInteraction = useCallback((
-    blockType: BlockTypes,
-    index: number,
-    action: 'remove' | 'place' | 'up'
-  ) => {
-    const block = groupedBlocks[blockType][index];
-    if (action === 'remove') {
-      handleRemoveBlock(block.key);
-    } else if (action === 'place') {
-      handlePlaceBlock(block.position, [0, 1, 0]);
-    } else if (action === 'up') {
-      // Do nothing
-    }
-  }, [groupedBlocks, handleRemoveBlock, handlePlaceBlock]);
-
   return (
     <>
       {Object.entries(groupedBlocks).map(([type, blockGroup]) => (
@@ -56,11 +28,6 @@ function World({
           key={type}
           blocks={blockGroup}
           blockType={Number(type) as BlockTypes}
-          onBlockInteraction={(index, action) =>
-            handleBlockInteraction(Number(type) as BlockTypes, index, action)
-          }
-          selectedBlock={selectedBlock}
-          currentBlockType={currentBlockType}
         />
       ))}
     </>

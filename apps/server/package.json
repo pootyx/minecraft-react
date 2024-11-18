@@ -9,6 +9,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
   },
   "dependencies": {
+    "seedrandom": "^3.0.5",
+    "simplex-noise": "^4.0.3",
     "uWebSockets.js": "uNetworking/uWebSockets.js#v20.49.0"
   },
   "devDependencies": {

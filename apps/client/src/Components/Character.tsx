@@ -1,16 +1,20 @@
-import { useThree, useFrame } from '@react-three/fiber';
-import { useEffect, useRef } from 'react';
-import { Vector3, Box3 } from 'three';
-import { useKeyboardControls } from '@react-three/drei';
-import { BlockType } from './Block';
+import { useThree, useFrame } from "@react-three/fiber";
+import { useEffect, useRef } from "react";
+import { Vector3, Box3 } from "three";
+import { useKeyboardControls } from "@react-three/drei";
+import { Block } from "./Block";
 
 function Character({
   blocks,
   playerId,
   socket,
-}: { blocks: BlockType[]; playerId: string; socket: WebSocket | null }) {
+}: {
+  blocks: Block[];
+  playerId: string;
+  socket: WebSocket | null;
+}) {
   const { camera } = useThree();
-  const position = useRef(new Vector3(1, 200, 1));
+  const position = useRef(new Vector3(1, 20, 1));
   const velocity = useRef(new Vector3());
   const [sub, get] = useKeyboardControls();
 
@@ -141,7 +145,7 @@ function Character({
     if (socket) {
       socket.send(
         JSON.stringify({
-          type: 'playerMove',
+          type: "playerMove",
           playerId: playerId,
           position: position.current.toArray(),
         })

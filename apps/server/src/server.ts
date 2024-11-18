@@ -1,6 +1,8 @@
+import { Buffer } from "buffer";
 import uWS from "uWebSockets.js";
 import { BlockType, BlockTypes } from "./types";
-import { Buffer } from "buffer";
+import { createNoise2D, createNoise3D } from "simplex-noise";
+import seedrandom from "seedrandom";
 
 const port = 9001;
 
@@ -15,37 +17,65 @@ const app = uWS.App();
 let players: { [key: string]: Player } = {};
 let blocks: BlockType[] = [];
 
-// Initialize the world with some blocks
-const initializeWorld = () => {
-  const size = 100;
-  const depth = 1;
+const generateWorld = (size: number, maxHeight: number) => {
+  function xoshiro128ss(a: number, b: number, c: number, d: number) {
+    return function () {
+      let t = b << 9,
+        r = b * 5;
+      r = ((r << 7) | (r >>> 25)) * 9;
+      c ^= a;
+      d ^= b;
+      b ^= c;
+      a ^= d;
+      c ^= t;
+      d = (d << 11) | (d >>> 21);
+      return (r >>> 0) / 4294967296;
+    };
+  }
+
+  const seedgen = 2629793367;
+  const getRand = xoshiro128ss(seedgen, seedgen, seedgen, seedgen);
+
+  const noise2D = createNoise2D(() => getRand());
+  const blocks: BlockType[] = [];
+
+  const generationParams = {
+    scale: 56,
+    magnitude: 0.6,
+    offset: 0.2,
+  };
+
   for (let x = 0; x < size; x++) {
     for (let z = 0; z < size; z++) {
-      for (let y = 0; y < depth; y++) {
-        let blockType: BlockTypes;
-        if (y === depth - 1) {
-          blockType = BlockTypes.GRASS;
-        } else if (y > depth - 4) {
-          blockType = BlockTypes.DIRT;
-        } else {
-          blockType = BlockTypes.STONE;
-        }
-        blocks.push({
-          key: `${x}-${y}-${z}`,
-          position: [x, y, z],
-          uuid: Math.random().toString(36).substr(2, 9),
-          type: blockType,
-        });
-      }
+      const noiseValue = noise2D(
+        x / generationParams.scale,
+        z / generationParams.scale
+      );
+      const scaledNoiseValue =
+        generationParams.offset + generationParams.magnitude * noiseValue;
+      let height = Math.floor(maxHeight * scaledNoiseValue);
+      height = Math.max(0, Math.min(height, maxHeight - 1));
+
+      blocks.push({
+        key: `${x}-${height}-${z}`,
+        position: [x, height, z],
+        uuid: Math.random().toString(36).substring(2, 9),
+        type: BlockTypes.GRASS,
+      });
     }
   }
+  return blocks;
+};
+
+const initializeWorld = () => {
+  blocks = generateWorld(50, 20);
 };
 
 initializeWorld();
 
 app.ws("/*", {
   open: (ws) => {
-    const playerId = Math.random().toString(36).substr(2, 9);
+    const playerId = Math.random().toString(36).substring(2, 9);
     players[playerId] = {
       id: playerId,
       position: [0, 1, 0],
@@ -54,7 +84,6 @@ app.ws("/*", {
 
     console.log(`Player ${playerId} connected`);
 
-    // Send initial state to the new player
     ws.send(
       JSON.stringify({
         type: "initialState",
@@ -63,7 +92,6 @@ app.ws("/*", {
       })
     );
 
-    // Notify other players about the new player
     app.publish(
       "players",
       JSON.stringify({
@@ -73,7 +101,6 @@ app.ws("/*", {
       })
     );
 
-    // Subscribe the player to updates
     ws.subscribe("players");
     ws.subscribe("blocks");
   },

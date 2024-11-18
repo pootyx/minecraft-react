@@ -1,8 +1,9 @@
 export enum BlockTypes {
-  DIRT,
-  GRASS,
-  STONE,
-  // Add other block types as needed
+  DIRT = 0,
+  GRASS = 1,
+  WOOD = 2,
+  STONE = 3,
+  SAND = 4,
 }
 
 export interface BlockType {
